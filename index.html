@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="description" content="Qadam — биржа digital-заказов для Казахстана и СНГ">
-  <meta name="supabase-url" content="">
-  <meta name="supabase-anon-key" content="">
+  <meta name="supabase-url" content="https://ahmxaaxvsmxcapzolexh.supabase.co">
+  <meta name="supabase-publishable-key" content="sb_publishable_rnSO8JWOTwxQ9nNwyUrJqQ_YSlq39PG">
   <title>Qadam — заказы для фрилансеров</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23182435'/%3E%3Cpath d='M17 32c0-10 6-17 16-17s16 7 16 17c0 5-2 9-5 12l5 5H38l-2-2h-3c-10 0-16-6-16-15Zm16-8c-5 0-7 3-7 8s2 7 7 7h1l-4-4h9l1 1v-4c0-5-2-8-7-8Z' fill='%23fff'/%3E%3Cpath d='M42 12h9v9h-9z' fill='%23f26b38'/%3E%3C/svg%3E">
   <style>
@@ -34,8 +34,8 @@
         <article class="setup-step"><div class="step-number">1</div><h2>Создай бесплатный проект</h2><p>Открой <a href="https://supabase.com/dashboard" target="_blank" rel="noreferrer">supabase.com/dashboard</a>, нажми <b>New project</b>, придумай название и пароль базы. Регион выбери ближайший. Дождись запуска проекта.</p></article>
         <article class="setup-step"><div class="step-number">2</div><h2>Создай таблицы и правила безопасности</h2><p>В панели Supabase открой <b>SQL Editor → New query</b>. Скопируй весь код ниже, вставь и нажми <b>Run</b>.</p><div class="code-wrap"><button class="copy-btn" data-copy="sqlCode">Копировать SQL</button><pre id="sqlCode"></pre></div></article>
         <article class="setup-step"><div class="step-number">3</div><h2>Включи вход через Google</h2><ol><li>Открой <b>Authentication → Providers → Google</b>.</li><li>Включи Google и вставь Client ID и Client Secret, созданные в Google Cloud.</li><li>В <b>URL Configuration</b> добавь адрес этого приложения в Redirect URLs.</li></ol><p>Для первого теста можно оставить только вход по email, но перед настоящим запуском владельцем аккаунтов и проекта должен быть родитель или другой взрослый.</p></article>
-        <article class="setup-step"><div class="step-number">4</div><h2>Скопируй URL и публичный ключ</h2><p>Открой <b>Project Settings → API</b>. Нужны только <b>Project URL</b> и <b>anon public key</b>. Ключ <b>service_role</b> сюда вставлять нельзя.</p><div class="config-fields"><div class="field"><label>Project URL</label><input id="setupUrl" placeholder="https://xxxxx.supabase.co"></div><div class="field"><label>anon public key</label><textarea id="setupKey" rows="3" placeholder="eyJhbGciOi..."></textarea></div></div><div id="setupStatus" class="setup-status">Сейчас приложение работает с демонстрационными данными.</div><div class="code-wrap"><button class="copy-btn" data-copy="configCode">Копировать настройки</button><pre id="configCode">&lt;meta name="supabase-url" content="ВСТАВЬ_URL"&gt;
-&lt;meta name="supabase-anon-key" content="ВСТАВЬ_ANON_KEY"&gt;</pre></div><p>После вставки значений скачай обновлённый файл или замени эти две строки в начале <code>index.html</code>.</p><button class="btn btn-dark" id="saveLocalConfig">Проверить в этом браузере</button></article>
+        <article class="setup-step"><div class="step-number">4</div><h2>Скопируй URL и публичный ключ</h2><p>Открой <b>Project Settings → API Keys</b>. Нужны только <b>Project URL</b> и ключ <b>Publishable</b>, начинающийся с <code>sb_publishable_</code>. Ключи <b>Secret</b> и <b>service_role</b> сюда вставлять нельзя.</p><div class="config-fields"><div class="field"><label>Project URL</label><input id="setupUrl" placeholder="https://xxxxx.supabase.co"></div><div class="field"><label>Publishable key</label><textarea id="setupKey" rows="3" placeholder="sb_publishable_..."></textarea></div></div><div id="setupStatus" class="setup-status">Сейчас приложение работает с демонстрационными данными.</div><div class="code-wrap"><button class="copy-btn" data-copy="configCode">Копировать настройки</button><pre id="configCode">&lt;meta name="supabase-url" content="ВСТАВЬ_URL"&gt;
+&lt;meta name="supabase-publishable-key" content="ВСТАВЬ_PUBLISHABLE_KEY"&gt;</pre></div><p>После вставки значений скачай обновлённый файл или замени эти две строки в начале <code>index.html</code>.</p><button class="btn btn-dark" id="saveLocalConfig">Проверить в этом браузере</button></article>
       </div></section>
     </main>
     <aside class="rightbar"><section class="panel stat-panel"><h3>Сегодня на Qadam</h3><div class="stat-row"><span>Новых заказов</span><strong>28</strong></div><div class="stat-row"><span>Активных проектов</span><strong id="sideCount">0</strong></div><div class="stat-row"><span>Средний бюджет</span><strong>72 000 ₸</strong></div></section><section class="panel safety"><h3>Проверь перед началом</h3><p>Согласуй объём, срок и оплату в переписке. Не сообщай коды из SMS и не переводи «страховой взнос».</p><button class="text-link" id="safetyBtn">Памятка безопасности</button></section><section class="setup-card"><h3>Сервер ещё не подключён?</h3><p>В приложении есть готовый SQL и пошаговая настройка Supabase.</p><button class="btn btn-primary" data-view="settings">Открыть инструкцию</button></section></aside>
@@ -106,6 +106,12 @@ for each row execute procedure public.limit_active_jobs();
 alter table public.profiles enable row level security;
 alter table public.jobs enable row level security;
 
+grant usage on schema public to anon, authenticated;
+grant select on public.profiles to anon, authenticated;
+grant update on public.profiles to authenticated;
+grant select on public.jobs to anon, authenticated;
+grant insert, update, delete on public.jobs to authenticated;
+
 drop policy if exists "profiles are readable" on public.profiles;
 create policy "profiles are readable" on public.profiles for select using (true);
 drop policy if exists "users update own profile" on public.profiles;
@@ -127,7 +133,7 @@ create policy "users delete own jobs" on public.jobs for delete using (auth.uid(
     ];
     const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
     const state={jobs:[],saved:JSON.parse(localStorage.getItem('qadam_saved')||'[]'),category:'',query:'',view:'catalog',user:null,contact:null};
-    const config={url:(localStorage.getItem('qadam_supabase_url')||document.querySelector('meta[name="supabase-url"]').content).replace(/\/$/,''),key:localStorage.getItem('qadam_supabase_key')||document.querySelector('meta[name="supabase-anon-key"]').content};
+    const config={url:(localStorage.getItem('qadam_supabase_url')||document.querySelector('meta[name="supabase-url"]').content).replace(/\/$/,''),key:localStorage.getItem('qadam_supabase_key')||document.querySelector('meta[name="supabase-publishable-key"]').content};
     const configured=()=>/^https:\/\/.+\.supabase\.co$/.test(config.url)&&config.key.length>40;
     const esc=v=>String(v??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
     const token=()=>localStorage.getItem('qadam_access_token')||'';
@@ -157,8 +163,8 @@ create policy "users delete own jobs" on public.jobs for delete using (auth.uid(
     $('#saveProfile').onclick=async()=>{const value=$('#profileTelegram').value.trim().replace(/^@/,'');if(value&&!/^[A-Za-z0-9_]{5,32}$/.test(value))return toast('Проверь Telegram username');localStorage.setItem('qadam_telegram',value);if(configured()&&token()&&state.user?.id!=='demo-user'){try{await api('profiles?id=eq.'+state.user.id,{method:'PATCH',body:JSON.stringify({telegram_username:value})})}catch(e){return toast(e.message)}}toast('Профиль сохранён')};
     $('#publishForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),telegram=String(f.get('telegram')||'').replace(/^@/,'');const job={owner_id:state.user.id,title:String(f.get('title')),category:String(f.get('category')),description:String(f.get('description')),budget:String(f.get('budget')),location:String(f.get('location')),skills:String(f.get('skills')||'').split(',').map(x=>x.trim()).filter(Boolean),telegram_username:telegram||null,created_at:new Date().toISOString(),expires_at:new Date(Date.now()+30*864e5).toISOString(),status:'active',author:state.user.name||'Пользователь Qadam'};try{if(configured()&&token()&&state.user.id!=='demo-user'){const [saved]=await api('jobs',{method:'POST',body:JSON.stringify(job)});state.jobs.unshift({...saved,author:job.author})}else{job.id='local-'+Date.now();state.jobs.unshift(job)}e.target.reset();closeModals();render();setView('mine');toast('Объявление опубликовано на 30 дней')}catch(err){toast(err.message||'Не удалось опубликовать')}};
     $('#openTelegram').onclick=()=>{const u=state.contact?.telegram_username;if(!u)return toast('В демо реальный контакт скрыт');window.open('https://t.me/'+u,'_blank','noopener')};
-    $('#saveLocalConfig').onclick=()=>{const url=$('#setupUrl').value.trim().replace(/\/$/,''),key=$('#setupKey').value.trim();if(!/^https:\/\/.+\.supabase\.co$/.test(url)||key.length<40)return toast('Проверь URL и anon key');localStorage.setItem('qadam_supabase_url',url);localStorage.setItem('qadam_supabase_key',key);toast('Настройки сохранены — обновляю');setTimeout(()=>location.reload(),700)};
-    $('#setupUrl').oninput=$('#setupKey').oninput=()=>{$('#configCode').textContent='<meta name="supabase-url" content="'+($('#setupUrl').value||'ВСТАВЬ_URL')+'">\n<meta name="supabase-anon-key" content="'+($('#setupKey').value||'ВСТАВЬ_ANON_KEY')+'">'};
+    $('#saveLocalConfig').onclick=()=>{const url=$('#setupUrl').value.trim().replace(/\/$/,''),key=$('#setupKey').value.trim();if(!/^https:\/\/.+\.supabase\.co$/.test(url)||!key.startsWith('sb_publishable_'))return toast('Проверь URL и Publishable key');localStorage.setItem('qadam_supabase_url',url);localStorage.setItem('qadam_supabase_key',key);toast('Настройки сохранены — обновляю');setTimeout(()=>location.reload(),700)};
+    $('#setupUrl').oninput=$('#setupKey').oninput=()=>{$('#configCode').textContent='<meta name="supabase-url" content="'+($('#setupUrl').value||'ВСТАВЬ_URL')+'">\n<meta name="supabase-publishable-key" content="'+($('#setupKey').value||'ВСТАВЬ_PUBLISHABLE_KEY')+'">'};
     restoreAuth();load();
   </script>
 </body>
