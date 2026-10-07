@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://adilzhankasym6-creator.github.io/Qadam-Freelance/sitemap.xml
