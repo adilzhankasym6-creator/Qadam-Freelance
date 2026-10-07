@@ -297,5 +297,6 @@ create policy "users delete own jobs" on public.jobs for delete using (auth.uid(
     $('#profilePublish').onclick=()=>$('#openPublish').click();
     restoreAuth().then(async()=>{await syncTelegramLink();await load()});
   </script>
+<script src="external-jobs.js"></script>
 </body>
 </html>
