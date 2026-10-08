@@ -145,14 +145,24 @@
   function installAdminButton() {
     if (!state.profile?.is_admin) return;
     const view = document.querySelector('#view-admin');
-    if (!view || document.querySelector('#openExternalJob')) return;
-    const button = document.createElement('button');
-    button.id = 'openExternalJob';
-    button.className = 'btn btn-primary';
-    button.style.marginLeft = '8px';
-    button.textContent = 'Добавить заказ из Telegram';
-    button.onclick = () => document.querySelector('#externalJobModal').classList.add('open');
-    view.querySelector('#refreshReports')?.insertAdjacentElement('afterend', button);
+    if (view && !document.querySelector('#openExternalJob')) {
+      const button = document.createElement('button');
+      button.id = 'openExternalJob';
+      button.className = 'btn btn-primary';
+      button.style.marginLeft = '8px';
+      button.textContent = 'Добавить заказ из Telegram';
+      button.onclick = () => document.querySelector('#externalJobModal').classList.add('open');
+      view.querySelector('#refreshReports')?.insertAdjacentElement('afterend', button);
+    }
+    const profileActions = document.querySelector('.profile-actions');
+    if (profileActions && !document.querySelector('#mobileAdminButton')) {
+      const mobileButton = document.createElement('button');
+      mobileButton.id = 'mobileAdminButton';
+      mobileButton.className = 'btn btn-dark';
+      mobileButton.textContent = 'Модерация';
+      mobileButton.onclick = () => setView('admin');
+      profileActions.prepend(mobileButton);
+    }
   }
 
   const originalRender = render;
@@ -165,4 +175,3 @@
   installAdminForm();
   loadExternal().then(installAdminButton);
 })();
-
