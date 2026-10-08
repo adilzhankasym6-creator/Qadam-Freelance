@@ -32,7 +32,7 @@
   <meta name="supabase-publishable-key" content="sb_publishable_rnSO8JWOTwxQ9nNwyUrJqQ_YSlq39PG">
 <title>Qadam Freelance — биржа фриланса Казахстана и СНГ</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23182435'/%3E%3Cpath d='M17 32c0-10 6-17 16-17s16 7 16 17c0 5-2 9-5 12l5 5H38l-2-2h-3c-10 0-16-6-16-15Zm16-8c-5 0-7 3-7 8s2 7 7 7h1l-4-4h9l1 1v-4c0-5-2-8-7-8Z' fill='%23fff'/%3E%3Cpath d='M42 12h9v9h-9z' fill='%23f26b38'/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="qadam-ui.css?v=2">
+  <link rel="stylesheet" href="qadam-ui.css?v=4">
   <style>
     :root{--ink:#182435;--text:#263346;--muted:#748094;--line:#dfe3e8;--paper:#fff;--bg:#f4f5f6;--soft:#eef1f3;--orange:#f26b38;--orange2:#da5425;--green:#15845b;--red:#c34646;--blue:#3568b8;--shadow:0 8px 24px rgba(30,40,55,.08)}
     *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,"Segoe UI",Arial,sans-serif;font-size:15px}button,input,textarea,select{font:inherit}button{cursor:pointer}a{color:inherit}.hidden{display:none!important}.muted{color:var(--muted)}
@@ -298,7 +298,7 @@ create policy "users delete own jobs" on public.jobs for delete using (auth.uid(
     $('#profilePublish').onclick=()=>$('#openPublish').click();
     restoreAuth().then(()=>{render();load();syncTelegramLink(true)});
   </script>
-<script src="external-jobs.js?v=5"></script>
-<script src="qadam-ui.js?v=2"></script>
+<script src="external-jobs.js?v=6"></script>
+<script src="qadam-ui.js?v=4"></script>
 </body>
 </html>

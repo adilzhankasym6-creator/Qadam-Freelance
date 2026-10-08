@@ -140,6 +140,7 @@ body.qadam-v2{
 .qadam-v2 .save{right:14px;top:14px;border:0;border-radius:50%;background:#eeeeF2;font-size:18px}
 .qadam-v2 .budget{font-size:18px;letter-spacing:-.02em}
 .qadam-v2 .job-actions{gap:8px}
+.mobile-filter-bar{display:none}
 
 .client-studio{margin-top:26px;padding:28px;border-radius:24px;background:#fff;border:1px solid var(--line)}
 .client-studio-head{display:flex;justify-content:space-between;gap:18px;align-items:start}
@@ -219,11 +220,20 @@ body.qadam-v2{
   .category-tile{min-width:142px;min-height:104px;scroll-snap-align:start}
   .section-heading h2{font-size:20px}
   .qadam-v2 .feed-head h1{font-size:21px}
+  .mobile-filter-bar{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 14px}
+  .mobile-filter-bar label{min-width:0;padding:9px 10px;border:1px solid var(--line);border-radius:14px;background:#fff}
+  .mobile-filter-bar span{display:block;margin-bottom:4px;color:var(--muted);font-size:10px;font-weight:750;text-transform:uppercase;letter-spacing:.04em}
+  .mobile-filter-bar select{display:block;width:100%;height:28px;padding:0 24px 0 0;border:0;background-color:transparent;color:var(--ink);font-size:12px;font-weight:750;outline:0}
   .qadam-v2 .job{grid-template-columns:1fr;border-radius:18px}
   .qadam-v2 .job-body{padding:18px}
-  .qadam-v2 .job-side{border-left:0;border-top:1px solid #ededf0;padding:15px 18px;grid-template-columns:minmax(0,1fr) auto}
-  .qadam-v2 .job-actions{grid-template-columns:1fr 1fr}
-  .qadam-v2 .job-actions .btn{padding:9px 11px;font-size:12px}
+  .qadam-v2 .job-top{flex-wrap:wrap;row-gap:6px}
+  .qadam-v2 .job-time{margin-left:0;width:100%}
+  .qadam-v2 .job-side{border-left:0;border-top:1px solid #ededf0;padding:15px 18px;display:flex;flex-direction:column;align-items:stretch;gap:12px;min-width:0}
+  .qadam-v2 .job-side>div:first-of-type{min-width:0;padding-right:46px}
+  .qadam-v2 .budget{display:block;max-width:100%;margin:4px 0 0;line-height:1.25;overflow-wrap:anywhere;word-break:break-word}
+  .qadam-v2 .job-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:100%;gap:8px}
+  .qadam-v2 .job-actions .btn{width:100%;min-width:0;padding:9px 8px;font-size:12px;white-space:normal;text-align:center;line-height:1.2}
+  .qadam-v2 .save{top:13px;right:14px}
   .client-studio{padding:22px 18px;border-radius:20px}
   .client-studio h2{font-size:21px}
   .template-grid{grid-template-columns:1fr 1fr}
@@ -259,6 +269,8 @@ body.qadam-v2{
   .hero-actions{display:grid;grid-template-columns:1fr}
   .template-grid{grid-template-columns:1fr}
   .category-tile{min-width:132px}
+  .mobile-filter-bar{grid-template-columns:1fr}
+  .qadam-v2 .job-actions{grid-template-columns:1fr}
 }
 
 @media(prefers-reduced-motion:reduce){

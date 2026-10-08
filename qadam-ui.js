@@ -1,4 +1,4 @@
-/* Qadam UI v2: категории, региональные валюты и новый интерфейс. */
+/* Qadam UI v4: стабильная загрузка, сохранение фильтров и адаптивный интерфейс. */
 (() => {
   const categories = [
     { value: 'Сайты', icon: '⌘', title: 'Сайты и лендинги', note: 'Tilda, Webflow, WordPress', group: 'Разработка' },
@@ -48,8 +48,9 @@
 
   function currencyFromLocation(location = '') {
     const text = String(location).toLowerCase();
-    if (/росси|москв|петербург|санкт|\bрф\b|снг/.test(text)) return 'RUB';
-    return 'KZT';
+    if (/росси|москв|петербург|санкт|\bрф\b|снг|узбекистан|кыргыз|беларус|армени|азербайджан|таджикистан|молдова/.test(text)) return 'RUB';
+    if (/казахстан|алматы|астана|караганда|шымкент|актау|атырау|павлодар|семей|тараз|костанай|актобе|кызылорда|уральск|петропавловск|усть[- ]каменогорск/.test(text)) return 'KZT';
+    return '';
   }
 
   function currencySymbol(code) {
@@ -59,7 +60,10 @@
   function formatBudget(value, location = '', explicitCurrency = '') {
     const original = String(value || '').trim();
     if (!original || /договор|по итог|обсужд|не указан/i.test(original)) return original || 'Договорная';
-    const currency = explicitCurrency || currencyFromLocation(location);
+    const markedCurrency = /(?:₽|RUB|руб(?:\.|лей|ля)?)/i.test(original)
+      ? 'RUB'
+      : /(?:₸|KZT|тенге)/i.test(original) ? 'KZT' : '';
+    const currency = currencyFromLocation(location) || markedCurrency || explicitCurrency || 'KZT';
     const cleaned = original
       .replace(/(?:₸|₽|тенге|руб(?:\.|лей|ля)?|KZT|RUB)/gi, '')
       .replace(/\s+/g, ' ')
@@ -69,8 +73,14 @@
   }
 
   window.qadamFormatBudget = formatBudget;
+  window.qadamCurrencyFromLocation = currencyFromLocation;
   window.qadamCategories = categories;
+  if (window.__QADAM_UNIT_TEST__) return;
   document.body.classList.add('qadam-v2');
+  const savedRegion = localStorage.getItem('qadam_region') || '';
+  const savedSort = localStorage.getItem('qadam_sort') || 'new';
+  state.region = regions.some(([value]) => value === savedRegion) ? savedRegion : '';
+  state.sort = ['new', 'old'].includes(savedSort) ? savedSort : 'new';
 
   function chooseCategory(value) {
     state.category = value || '';
@@ -209,10 +219,40 @@
     const select = document.querySelector('#city');
     if (!select) return;
     select.innerHTML = regions.map(([value, title]) => `<option value="${htmlEscape(value)}">${htmlEscape(title)}</option>`).join('');
-    state.region = state.region || '';
     select.value = state.region;
     select.onchange = () => {
       state.region = select.value;
+      localStorage.setItem('qadam_region', state.region);
+      const mobileSelect = document.querySelector('#mobileRegion');
+      if (mobileSelect) mobileSelect.value = state.region;
+      render();
+    };
+  }
+
+  function installMobileFilters() {
+    const feedHead = document.querySelector('#view-catalog .feed-head');
+    if (!feedHead || document.querySelector('.mobile-filter-bar')) return;
+    feedHead.insertAdjacentHTML('afterend', `
+      <div class="mobile-filter-bar" aria-label="Фильтры заказов">
+        <label><span>Регион</span><select id="mobileRegion">${regions.map(([value, title]) => `<option value="${htmlEscape(value)}">${htmlEscape(title)}</option>`).join('')}</select></label>
+        <label><span>Сортировка</span><select id="mobileSort"><option value="new">Сначала новые</option><option value="old">Сначала старые</option></select></label>
+      </div>`);
+    const regionSelect = document.querySelector('#mobileRegion');
+    const sortSelect = document.querySelector('#mobileSort');
+    regionSelect.value = state.region;
+    sortSelect.value = state.sort;
+    regionSelect.onchange = () => {
+      state.region = regionSelect.value;
+      localStorage.setItem('qadam_region', state.region);
+      const desktopSelect = document.querySelector('#city');
+      if (desktopSelect) desktopSelect.value = state.region;
+      render();
+    };
+    sortSelect.onchange = () => {
+      state.sort = sortSelect.value;
+      localStorage.setItem('qadam_sort', state.sort);
+      const desktopSort = document.querySelector('.feed-controls select');
+      if (desktopSort) desktopSort.value = state.sort;
       render();
     };
   }
@@ -232,9 +272,14 @@
     const select = document.querySelector('.feed-controls select');
     if (!select) return;
     select.innerHTML = '<option value="new">Сначала новые</option><option value="old">Сначала старые</option>';
-    state.sort = state.sort || 'new';
     select.value = state.sort;
-    select.onchange = () => { state.sort = select.value; render(); };
+    select.onchange = () => {
+      state.sort = select.value;
+      localStorage.setItem('qadam_sort', state.sort);
+      const mobileSort = document.querySelector('#mobileSort');
+      if (mobileSort) mobileSort.value = state.sort;
+      render();
+    };
   }
 
   function enhanceForm(form, options = {}) {
@@ -269,12 +314,25 @@
 
       const syncCurrency = force => {
         const inferred = currencyFromLocation(location?.value || options.location || '');
-        if (force || !currency.dataset.touched) currency.value = inferred;
+        if (inferred) {
+          currency.value = inferred;
+          currency.disabled = true;
+          currency.title = 'Валюта определена по региону';
+        } else {
+          currency.disabled = false;
+          currency.title = 'Выберите валюту для удалённого заказа';
+          if (force || !currency.dataset.touched) currency.value = currency.value || 'KZT';
+        }
       };
+      form.qadamSyncCurrency = syncCurrency;
       syncCurrency(true);
       location?.addEventListener('input', () => syncCurrency(false));
       location?.addEventListener('change', () => syncCurrency(false));
       currency.addEventListener('change', () => { currency.dataset.touched = '1'; });
+      const modal = form.closest('.modal-bg');
+      if (modal) new MutationObserver(() => {
+        if (modal.classList.contains('open')) syncCurrency(true);
+      }).observe(modal, { attributes: true, attributeFilter: ['class'] });
     }
   }
 
@@ -318,8 +376,9 @@
         const job = state.jobs.find(item => String(item.id) === String(jobId));
         const form = document.querySelector('#publishForm');
         if (job && form?.elements?.currency_ui) {
-          form.elements.currency_ui.value = job.currency || currencyFromLocation(job.location);
           form.elements.currency_ui.dataset.touched = '';
+          form.qadamSyncCurrency?.(true);
+          if (!currencyFromLocation(job.location)) form.elements.currency_ui.value = job.currency || 'KZT';
           form.elements.budget.value = String(job.budget || '').replace(/(?:₸|₽|тенге|руб(?:\.|лей|ля)?|KZT|RUB)/gi, '').trim();
         }
         return result;
@@ -435,6 +494,83 @@
     }
   }
 
+  function readJobsCache() {
+    try {
+      const cached = JSON.parse(localStorage.getItem('qadam_jobs_cache_v4') || '[]');
+      return Array.isArray(cached) ? cached : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function writeJobsCache(rows) {
+    try { localStorage.setItem('qadam_jobs_cache_v4', JSON.stringify(rows)); } catch {}
+  }
+
+  async function withRetry(request, attempts = 2) {
+    let lastError;
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      try { return await request(); }
+      catch (error) {
+        lastError = error;
+        if (attempt + 1 < attempts) await new Promise(resolve => setTimeout(resolve, 350));
+      }
+    }
+    throw lastError;
+  }
+
+  function installStableJobsLoader() {
+    const cached = readJobsCache();
+    if (!state.jobs.length && cached.length) state.jobs = cached;
+    if (typeof load !== 'function' || load.qStableLoader) return;
+    let sequence = 0;
+    let errorShown = false;
+    load = async function () {
+      if (!configured()) {
+        state.jobs = cached.length ? cached : demoJobs;
+        render();
+        return;
+      }
+      const requestId = ++sequence;
+      try {
+        const rows = await withRetry(() => api('jobs?select=*&order=created_at.desc'));
+        if (requestId !== sequence) return;
+        const ownerIds = [...new Set((rows || []).map(item => item.owner_id).filter(Boolean))];
+        let people = [];
+        if (ownerIds.length) {
+          people = await withRetry(() => api(`profiles?id=in.(${ownerIds.join(',')})&select=id,display_name,telegram_username,avatar_url,role,bio,skills`))
+            .catch(() => api(`profiles?id=in.(${ownerIds.join(',')})&select=id,display_name,telegram_username`));
+        }
+        if (requestId !== sequence) return;
+        const profileMap = Object.fromEntries((people || []).map(person => [person.id, person]));
+        state.jobs = (rows || []).map(row => {
+          const profile = profileMap[row.owner_id] || {};
+          return {
+            ...row,
+            profiles: profile,
+            author: profile.display_name || 'Пользователь Qadam',
+            telegram_username: row.telegram_username || profile.telegram_username || '',
+            avatar_url: profile.avatar_url || ''
+          };
+        });
+        writeJobsCache(state.jobs);
+        errorShown = false;
+        if (typeof loadProfileExtras === 'function') await loadProfileExtras().catch(() => {});
+      } catch (error) {
+        console.warn('Jobs load:', error);
+        const fallback = readJobsCache();
+        if (!state.jobs.length && fallback.length) state.jobs = fallback;
+        if (!errorShown) {
+          toast(fallback.length ? 'Связь восстановится автоматически — показаны последние данные' : 'Не удалось загрузить объявления. Проверьте интернет и обновите страницу');
+          errorShown = true;
+        }
+      }
+      render();
+    };
+    load.qStableLoader = true;
+    window.addEventListener('online', () => load());
+  }
+
   function polishExistingContent() {
     document.querySelector('#search')?.setAttribute('placeholder', 'Поиск заказов, навыков и услуг');
     const logoText = document.querySelector('.logo > span:last-child');
@@ -444,6 +580,7 @@
   }
 
   function start() {
+    installStableJobsLoader();
     installRegionsList();
     installCategoryModal();
     installHero();
@@ -451,6 +588,7 @@
     rebuildNavigation();
     rebuildRegionFilter();
     enhanceSort();
+    installMobileFilters();
     enhanceForm(document.querySelector('#publishForm'));
     enhanceForm(document.querySelector('#externalJobForm'));
     enhanceForm(document.querySelector('#bidForm'));
