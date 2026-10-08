@@ -452,6 +452,69 @@
     document.querySelector('#sidePublish').onclick = () => document.querySelector('#openPublish')?.click();
   }
 
+  function installPwaControls() {
+    const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    if (standalone) {
+      document.body.classList.add('qadam-installed-app');
+      return;
+    }
+    if (!document.querySelector('#installGuideModal')) {
+      document.body.insertAdjacentHTML('beforeend', `
+        <div class="modal-bg" id="installGuideModal"><div class="modal install-guide-modal">
+          <header class="modal-head"><div><h2>Установить Qadam</h2><p>Приложение появится на главном экране</p></div><button class="close" data-install-close>×</button></header>
+          <div class="modal-body">
+            <div class="install-platform" data-install-ios>
+              <strong>На iPhone и iPad</strong>
+              <ol><li>Откройте Qadam именно в Safari.</li><li>Нажмите кнопку «Поделиться».</li><li>Выберите «На экран Домой» и нажмите «Добавить».</li></ol>
+            </div>
+            <div class="install-platform" data-install-android>
+              <strong>На Android</strong>
+              <ol><li>Откройте Qadam в Chrome.</li><li>Нажмите меню ⋮.</li><li>Выберите «Установить приложение» или «Добавить на главный экран».</li></ol>
+            </div>
+            <p class="field-hint">После установки Qadam запускается отдельным окном, как обычное приложение.</p>
+          </div>
+        </div>`);
+      const modal = document.querySelector('#installGuideModal');
+      modal.querySelector('[data-install-close]').onclick = () => modal.classList.remove('open');
+      modal.onclick = event => { if (event.target === modal) modal.classList.remove('open'); };
+    }
+
+    const actions = document.querySelector('.hero-actions');
+    if (!actions || document.querySelector('#installQadamApp')) return;
+    const button = document.createElement('button');
+    button.id = 'installQadamApp';
+    button.className = 'btn hero-secondary pwa-install-button';
+    button.type = 'button';
+    button.textContent = 'Установить приложение';
+    actions.appendChild(button);
+
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', event => {
+      event.preventDefault();
+      deferredPrompt = event;
+      button.classList.add('install-ready');
+    });
+    window.addEventListener('appinstalled', () => {
+      deferredPrompt = null;
+      button.remove();
+      toast('Qadam установлен');
+    });
+    button.onclick = async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const choice = await deferredPrompt.userChoice.catch(() => null);
+        deferredPrompt = null;
+        if (choice?.outcome === 'accepted') button.remove();
+        return;
+      }
+      const modal = document.querySelector('#installGuideModal');
+      const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      modal.querySelector('[data-install-ios]').hidden = !ios;
+      modal.querySelector('[data-install-android]').hidden = ios;
+      modal.classList.add('open');
+    };
+  }
+
   function updateCategoryState() {
     const grid = document.querySelector('#categoryGrid');
     if (grid) grid.innerHTML = renderCategoryTiles();
@@ -602,6 +665,7 @@
     installDialogEnhancements();
     installClientStudio();
     installClientSideCard();
+    installPwaControls();
     installRenderEnhancements();
     polishExistingContent();
 
