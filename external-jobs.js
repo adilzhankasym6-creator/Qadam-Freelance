@@ -1,7 +1,19 @@
 /* Qadam Freelance: внешние Telegram-заказы. Подключить после основного script. */
 (() => {
-  const externalState = { rows: [] };
-  const categories = ['Сайты','Разработка','Дизайн','AI-контент','Маркетинг'];
+  const readExternalCache = () => {
+    try {
+      const rows = JSON.parse(localStorage.getItem('qadam_external_jobs_cache_v4') || '[]');
+      const now = Date.now();
+      return Array.isArray(rows) ? rows.filter(row => !row.expires_at || new Date(row.expires_at).getTime() > now) : [];
+    } catch { return []; }
+  };
+  const externalState = { rows: readExternalCache(), loaded: false };
+  const categories = [
+    'Сайты','Разработка','Мобильные приложения','Telegram-боты','Администрирование',
+    'Дизайн','Карточки товаров','3D и архитектура','AI-контент','Видео и анимация',
+    'Фото и ретушь','Тексты и копирайтинг','Переводы','Аудио и музыка','Маркетинг',
+    'SMM и контент','Маркетплейсы','Бизнес и консультации','Аналитика и данные','Обучение','Другое'
+  ];
 
   function updateAuthLabels() {
     const publish = document.querySelector('#openPublish');
@@ -79,6 +91,9 @@
   function card(row) {
     const username = cleanUsername(row.telegram_username);
     const source = String(row.source_url || '');
+    const shownBudget = window.qadamFormatBudget
+      ? window.qadamFormatBudget(row.budget, row.location, row.currency)
+      : row.budget;
     const adminDelete = state.profile?.is_admin
       ? `<button class="btn btn-danger" data-delete-external="${esc(row.id)}">Удалить</button>`
       : '';
@@ -98,7 +113,7 @@
         </div>
       </div>
       <aside class="job-side">
-        <div><span class="budget-label">Бюджет</span><strong class="budget">${esc(row.budget)}</strong></div>
+        <div><span class="budget-label">Бюджет</span><strong class="budget">${esc(shownBudget)}</strong></div>
         <div class="job-actions">
           <a class="btn btn-primary" href="https://t.me/${encodeURIComponent(username)}" target="_blank" rel="noopener">Написать заказчику</a>
           <a class="btn" href="${esc(source)}" target="_blank" rel="noopener">Оригинал объявления</a>
@@ -109,14 +124,27 @@
     </article>`;
   }
 
+  function updateCombinedCounts() {
+    const internalCount = typeof activeJobs === 'function'
+      ? activeJobs().length
+      : (state.jobs || []).filter(row => row.status === 'active').length;
+    const total = internalCount + externalState.rows.length;
+    const all = document.querySelector('#allCount');
+    const side = document.querySelector('#sideCount');
+    if (all) all.textContent = String(total);
+    if (side) side.textContent = String(total);
+  }
+
   function renderExternal() {
     document.querySelectorAll('.external-job').forEach(node => node.remove());
     const list = document.querySelector('#jobList');
     if (!list) return;
     const query = String(document.querySelector('#search')?.value || '').trim().toLowerCase();
     const category = state.category || '';
+    const region = String(document.querySelector('#city')?.value || '');
     const visible = externalState.rows.filter(row =>
       (!category || row.category === category) &&
+      (!region || !window.qadamMatchesRegion || window.qadamMatchesRegion(row.location, region)) &&
       (!query || `${row.title} ${row.description} ${(row.skills || []).join(' ')}`.toLowerCase().includes(query))
     );
     if (visible.length) {
@@ -133,14 +161,30 @@
         } catch (error) { toast(error.message || 'Не удалось удалить заказ'); }
       };
     });
+    updateCombinedCounts();
   }
 
   async function loadExternal() {
+    let lastError;
     try {
-      externalState.rows = await api(`external_jobs?select=*&status=eq.active&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&order=created_at.desc`);
+      let rows;
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          rows = await api(`external_jobs?select=*&status=eq.active&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&order=created_at.desc`);
+          lastError = null;
+          break;
+        } catch (error) {
+          lastError = error;
+          if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 350));
+        }
+      }
+      if (lastError) throw lastError;
+      externalState.rows = Array.isArray(rows) ? rows : [];
+      externalState.loaded = true;
+      try { localStorage.setItem('qadam_external_jobs_cache_v4', JSON.stringify(externalState.rows)); } catch {}
     } catch (error) {
       console.warn('External jobs:', error.message);
-      externalState.rows = [];
+      externalState.rows = externalState.rows.length ? externalState.rows : readExternalCache();
     }
     renderExternal();
   }
