@@ -3,6 +3,72 @@
   const externalState = { rows: [] };
   const categories = ['Сайты','Разработка','Дизайн','AI-контент','Маркетинг'];
 
+  function updateAuthLabels() {
+    const publish = document.querySelector('#openPublish');
+    if (publish) publish.textContent = state.user ? 'Разместить' : 'Войти и разместить';
+    const note = document.querySelector('#loginBlock .login-note');
+    if (note) note.textContent = 'Вход через Google защищает объявления от спама. После входа вы сможете опубликовать заказ.';
+  }
+
+  function installAuthGuard() {
+    const publish = document.querySelector('#openPublish');
+    if (publish) publish.addEventListener('click', () => {
+      if (!state.user) localStorage.setItem('qadam_pending_publish', String(Date.now()));
+    }, true);
+    updateAuthLabels();
+
+    const hasSessionHint = !!localStorage.getItem('qadam_user') ||
+      Object.keys(localStorage).some(key => key.startsWith('sb-') && key.endsWith('-auth-token'));
+    if (!hasSessionHint || !supabaseClient) return;
+
+    const guard = document.createElement('div');
+    guard.id = 'qadamAuthGuard';
+    guard.innerHTML = '<div><span class="logo-mark" style="margin:auto">Q</span><strong>Восстанавливаем вход…</strong><small>Проверяем профиль и Telegram</small></div>';
+    guard.style.cssText = 'position:fixed;inset:0;z-index:9999;background:#f4f5f6;display:grid;place-items:center;text-align:center;color:#182435';
+    guard.querySelector('div').style.cssText = 'display:grid;gap:12px';
+    guard.querySelector('small').style.cssText = 'color:#748094';
+    document.body.appendChild(guard);
+
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      guard.remove();
+      updateAuthLabels();
+      const pendingAt = Number(localStorage.getItem('qadam_pending_publish') || 0);
+      if (state.user && pendingAt && Date.now() - pendingAt < 30 * 60 * 1000) {
+        localStorage.removeItem('qadam_pending_publish');
+        setTimeout(() => document.querySelector('#openPublish')?.click(), 100);
+      }
+    };
+
+    const started = Date.now();
+    const timer = setInterval(() => {
+      if (state.profile?.telegram_username && !state.telegramLinked) {
+        state.telegramLinked = true;
+        localStorage.setItem('qadam_telegram_' + state.user?.id, String(state.profile.telegram_username).replace(/^@/, ''));
+        updateAccount();
+      }
+      const profileReady = state.user && !document.querySelector('#profileContent')?.classList.contains('hidden');
+      if (profileReady || Date.now() - started > 12000) {
+        clearInterval(timer);
+        finish();
+      }
+    }, 100);
+
+    supabaseClient.auth.getSession().then(({ data }) => {
+      if (!data?.session) {
+        clearInterval(timer);
+        localStorage.removeItem('qadam_user');
+        localStorage.removeItem('qadam_access_token');
+        finish();
+      }
+    }).catch(() => {
+      clearInterval(timer);
+      finish();
+    });
+  }
+
   const cleanUsername = value => String(value || '').trim().replace(/^@/, '');
   const validTelegram = value => /^[A-Za-z0-9_]{5,32}$/.test(cleanUsername(value));
   const sourceIsTelegram = value => {
@@ -168,10 +234,12 @@
   const originalRender = render;
   render = function () {
     originalRender();
+    updateAuthLabels();
     renderExternal();
     installAdminButton();
   };
 
+  installAuthGuard();
   installAdminForm();
   loadExternal().then(installAdminButton);
 })();
