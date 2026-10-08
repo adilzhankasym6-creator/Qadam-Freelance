@@ -74,6 +74,7 @@
 
   window.qadamFormatBudget = formatBudget;
   window.qadamCurrencyFromLocation = currencyFromLocation;
+  window.qadamMatchesRegion = matchesRegion;
   window.qadamCategories = categories;
   if (window.__QADAM_UNIT_TEST__) return;
   document.body.classList.add('qadam-v2');
@@ -260,13 +261,18 @@
   function matchesRegion(location, region) {
     if (!region) return true;
     const text = String(location || '').toLowerCase();
-    if (region === 'Казахстан') return /казахстан|алматы|астана|караганда|шымкент|актау|атырау|павлодар|семей|тараз/.test(text);
-    if (region === 'Россия') return /росси|москв|петербург|санкт|\bрф\b/.test(text);
-    if (region === 'СНГ') return /снг|узбекистан|кыргыз|беларус|армени|азербайджан|таджикистан|молдова/.test(text);
+    const kazakhstan = /казахстан|алматы|астана|караганда|шымкент|актау|атырау|павлодар|семей|тараз|костанай|актобе|кызылорда|уральск|петропавловск|усть[- ]каменогорск/.test(text);
+    const russia = /росси|москв|петербург|санкт|\bрф\b/.test(text);
+    const otherCis = /узбекистан|кыргыз|беларус|армени|азербайджан|таджикистан|молдова/.test(text);
+    const wholeCis = /снг/.test(text) && !kazakhstan && !russia && !otherCis;
+    const remoteOnly = /удал[её]н/.test(text) && !kazakhstan && !russia && !otherCis;
+    const universal = wholeCis || remoteOnly;
+    if (region === 'Казахстан') return kazakhstan || universal;
+    if (region === 'Россия') return russia || universal;
+    if (region === 'СНГ') return otherCis || universal;
     if (region === 'Удалённо') return /удал[её]н/.test(text);
     return true;
   }
-  window.qadamMatchesRegion = matchesRegion;
 
   function enhanceSort() {
     const select = document.querySelector('.feed-controls select');
