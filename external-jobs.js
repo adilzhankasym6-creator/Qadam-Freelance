@@ -1,6 +1,6 @@
 /* Qadam Premium + Telegram orders. Load after the main inline script. */
 (() => {
-  const externalState = { rows: [], loaded: false };
+  const externalState = { rows: [], loaded: false, error: '' };
   const premiumState = { active: false, type: 'loading', trial_ends_at: null, premium_until: null };
   const categories = [
     'Сайты','Разработка','Мобильные приложения','Telegram-боты','Администрирование',
@@ -216,10 +216,8 @@
   function filteredRows() {
     const query = String(document.querySelector('#search')?.value || '').trim().toLowerCase();
     const category = state.category || '';
-    const region = String(document.querySelector('#city')?.value || '');
     return externalState.rows.filter(row =>
       (!category || row.category === category) &&
-      (!region || !window.qadamMatchesRegion || window.qadamMatchesRegion(row.location, region)) &&
       (!query || `${row.title} ${row.description} ${(row.skills || []).join(' ')}`.toLowerCase().includes(query))
     );
   }
@@ -275,8 +273,11 @@
     const typeLabel = premiumState.type === 'premium' ? 'Premium активен' : premiumState.type === 'admin' ? 'Доступ администратора' : 'Пробный Premium';
     const jobs = externalState.rows.length
       ? externalState.rows.map(card).join('')
-      : '<div class="empty-small">Свежих Telegram-заказов пока нет. Новые появятся здесь автоматически.</div>';
+      : externalState.error
+      ? '<div class="empty-small">Не удалось получить Telegram-заказы с сервера.<br><button class="btn" data-premium-refresh style="margin-top:10px">Попробовать снова</button></div>'
+      : '<div class="empty-small">Свежих Telegram-заказов пока нет. Перешлите боту новое объявление из публичного канала.</div>';
     content.innerHTML = `<div class="premium-status"><div><strong>${typeLabel}</strong><span>${label}</span></div><span class="premium-live">Активен</span></div><div class="job-list premium-job-list">${jobs}</div>`;
+    content.querySelector('[data-premium-refresh]')?.addEventListener('click', loadExternal);
     if (promoText) promoText.textContent = `${typeLabel} · ${label}`;
     if (promoButton) promoButton.textContent = 'Смотреть';
     if (badge) badge.textContent = premiumState.type === 'trial' ? label.replace(' осталось', '') : 'Активен';
@@ -290,12 +291,14 @@
       return;
     }
     try {
-      const rows = await api(`external_jobs?select=*&status=eq.active&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&order=created_at.desc`);
+      const rows = await api('rpc/qadam_premium_orders', { method: 'POST', body: '{}' });
       externalState.rows = Array.isArray(rows) ? rows : [];
       externalState.loaded = true;
+      externalState.error = '';
     } catch (error) {
       console.warn('Premium orders:', error.message);
       externalState.rows = [];
+      externalState.error = error.message || 'Ошибка загрузки';
       if (state.view === 'premium') toast('Не удалось загрузить Premium-заказы');
     }
     renderExternal();
