@@ -305,7 +305,7 @@ create policy "users delete own jobs" on public.jobs for delete using (auth.uid(
     $('#profilePublish').onclick=()=>$('#openPublish').click();
     restoreAuth().then(()=>{render();load();syncTelegramLink(true)});
   </script>
-<script src="external-jobs.js?v=6"></script>
+<script src="external-jobs.js?v=7"></script>
 <script src="qadam-ui.js?v=6"></script>
 <script>
   if ('serviceWorker' in navigator) {
