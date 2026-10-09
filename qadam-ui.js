@@ -54,18 +54,25 @@
   }
 
   function currencySymbol(code) {
-    return code === 'RUB' ? '₽' : '₸';
+    if (code === 'RUB') return '₽';
+    if (code === 'USD') return '$';
+    if (code === 'EUR') return '€';
+    return '₸';
   }
 
   function formatBudget(value, location = '', explicitCurrency = '') {
     const original = String(value || '').trim();
     if (!original || /договор|по итог|обсужд|не указан/i.test(original)) return original || 'Договорная';
-    const markedCurrency = /(?:₽|RUB|руб(?:\.|лей|ля)?)/i.test(original)
+    const markedCurrency = /(?:\$|USD|доллар)/i.test(original)
+      ? 'USD'
+      : /(?:€|EUR|евро)/i.test(original)
+      ? 'EUR'
+      : /(?:₽|RUB|руб(?:\.|лей|ля)?)/i.test(original)
       ? 'RUB'
       : /(?:₸|KZT|тенге)/i.test(original) ? 'KZT' : '';
-    const currency = currencyFromLocation(location) || markedCurrency || explicitCurrency || 'KZT';
+    const currency = markedCurrency || explicitCurrency || currencyFromLocation(location) || 'KZT';
     const cleaned = original
-      .replace(/(?:₸|₽|тенге|руб(?:\.|лей|ля)?|KZT|RUB)/gi, '')
+      .replace(/(?:₸|₽|\$|€|тенге|руб(?:\.|лей|ля)?|доллар(?:ов|а)?|евро|KZT|RUB|USD|EUR)/gi, '')
       .replace(/\s+/g, ' ')
       .trim();
     if (!/\d/.test(cleaned)) return original;
@@ -194,7 +201,7 @@
       document.querySelector('#sideAllCategories').onclick = () => document.querySelector('#categoryModal')?.classList.add('open');
     }
 
-    const icons = { catalog: '⌕', mine: '▤', bids: '↗', saved: '☆', profile: '○', admin: '⚙' };
+    const icons = { catalog: '⌕', premium: '✦', mine: '▤', bids: '↗', saved: '☆', profile: '○', admin: '⚙' };
     document.querySelectorAll('.side-nav [data-view]').forEach(button => {
       if (!button.querySelector('.side-icon')) button.insertAdjacentHTML('afterbegin', `<span class="side-icon">${icons[button.dataset.view] || '•'}</span>`);
     });
@@ -205,11 +212,12 @@
         <button class="active" data-view="catalog">Заказы</button>
         <button data-view="bids">Отклики</button>
         <button class="mobile-publish" id="mobilePublishV2" aria-label="Разместить объявление">Разместить</button>
-        <button data-view="saved">Избранное</button>
+        <button data-view="premium">Premium</button>
         <button data-view="profile">Профиль</button>`;
       mobile.querySelectorAll('[data-view]').forEach(button => button.onclick = event => {
         event.preventDefault();
-        setView(button.dataset.view);
+        if (button.dataset.view === 'premium' && window.qadamOpenPremium) window.qadamOpenPremium();
+        else setView(button.dataset.view);
       });
       document.querySelector('#mobilePublishV2').onclick = () => document.querySelector('#openPublish')?.click();
     }
@@ -300,7 +308,7 @@
       location.placeholder = 'Например, Казахстан · удалённо';
       if (!location.value || location.value === 'Удалённо') location.value = 'Казахстан · удалённо';
       location.defaultValue = location.value;
-      location.insertAdjacentHTML('afterend', '<small class="region-list-note">Регион определяет валюту объявления</small>');
+      location.insertAdjacentHTML('afterend', '<small class="region-list-note">Мы предложим валюту по региону, но её можно изменить вручную</small>');
     }
 
     const budget = form.elements.budget || form.elements.price;
@@ -315,20 +323,14 @@
       currency.className = 'currency-select';
       currency.name = 'currency_ui';
       currency.setAttribute('aria-label', 'Валюта');
-      currency.innerHTML = '<option value="KZT">₸ KZT</option><option value="RUB">₽ RUB</option>';
+      currency.innerHTML = '<option value="KZT">₸ KZT</option><option value="RUB">₽ RUB</option><option value="USD">$ USD</option><option value="EUR">€ EUR</option><option value="NEGOTIABLE">Договорная</option>';
       wrapper.appendChild(currency);
 
       const syncCurrency = force => {
         const inferred = currencyFromLocation(location?.value || options.location || '');
-        if (inferred) {
-          currency.value = inferred;
-          currency.disabled = true;
-          currency.title = 'Валюта определена по региону';
-        } else {
-          currency.disabled = false;
-          currency.title = 'Выберите валюту для удалённого заказа';
-          if (force || !currency.dataset.touched) currency.value = currency.value || 'KZT';
-        }
+        currency.disabled = false;
+        currency.title = 'Выберите валюту объявления';
+        if (!currency.dataset.touched && (force || inferred)) currency.value = inferred || 'KZT';
       };
       form.qadamSyncCurrency = syncCurrency;
       syncCurrency(true);
@@ -350,7 +352,9 @@
   function normalizeFormMoney(form) {
     const input = form?.elements?.budget || form?.elements?.price;
     const currency = form?.elements?.currency_ui?.value || currencyFromLocation(form?.elements?.location?.value || '');
-    if (input) input.value = formatBudget(input.value, form?.elements?.location?.value || '', currency);
+    if (input) input.value = currency === 'NEGOTIABLE'
+      ? 'Договорная'
+      : formatBudget(input.value, form?.elements?.location?.value || '', currency);
   }
 
   function installMoneyHandlers() {
@@ -382,10 +386,9 @@
         const job = state.jobs.find(item => String(item.id) === String(jobId));
         const form = document.querySelector('#publishForm');
         if (job && form?.elements?.currency_ui) {
-          form.elements.currency_ui.dataset.touched = '';
-          form.qadamSyncCurrency?.(true);
-          if (!currencyFromLocation(job.location)) form.elements.currency_ui.value = job.currency || 'KZT';
-          form.elements.budget.value = String(job.budget || '').replace(/(?:₸|₽|тенге|руб(?:\.|лей|ля)?|KZT|RUB)/gi, '').trim();
+          form.elements.currency_ui.value = job.currency || currencyFromLocation(job.location) || 'KZT';
+          form.elements.currency_ui.dataset.touched = '1';
+          form.elements.budget.value = String(job.budget || '').replace(/(?:₸|₽|\$|€|тенге|руб(?:\.|лей|ля)?|доллар(?:ов|а)?|евро|KZT|RUB|USD|EUR)/gi, '').trim();
         }
         return result;
       };
@@ -400,7 +403,7 @@
         const form = document.querySelector('#bidForm');
         if (job && form?.elements?.currency_ui) {
           form.elements.currency_ui.value = job.currency || currencyFromLocation(job.location);
-          form.elements.currency_ui.dataset.touched = '';
+          form.elements.currency_ui.dataset.touched = '1';
         }
         return result;
       };
@@ -450,69 +453,6 @@
     if (!rightbar || document.querySelector('.client-side-card')) return;
     rightbar.insertAdjacentHTML('afterbegin', `<section class="client-side-card"><h3>Нужен исполнитель?</h3><p>Опишите задачу — специалисты предложат цену и срок.</p><button class="btn" id="sidePublish">Разместить бесплатно</button></section>`);
     document.querySelector('#sidePublish').onclick = () => document.querySelector('#openPublish')?.click();
-  }
-
-  function installPwaControls() {
-    const standalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-    if (standalone) {
-      document.body.classList.add('qadam-installed-app');
-      return;
-    }
-    if (!document.querySelector('#installGuideModal')) {
-      document.body.insertAdjacentHTML('beforeend', `
-        <div class="modal-bg" id="installGuideModal"><div class="modal install-guide-modal">
-          <header class="modal-head"><div><h2>Установить Qadam</h2><p>Приложение появится на главном экране</p></div><button class="close" data-install-close>×</button></header>
-          <div class="modal-body">
-            <div class="install-platform" data-install-ios>
-              <strong>На iPhone и iPad</strong>
-              <ol><li>Откройте Qadam именно в Safari.</li><li>Нажмите кнопку «Поделиться».</li><li>Выберите «На экран Домой» и нажмите «Добавить».</li></ol>
-            </div>
-            <div class="install-platform" data-install-android>
-              <strong>На Android</strong>
-              <ol><li>Откройте Qadam в Chrome.</li><li>Нажмите меню ⋮.</li><li>Выберите «Установить приложение» или «Добавить на главный экран».</li></ol>
-            </div>
-            <p class="field-hint">После установки Qadam запускается отдельным окном, как обычное приложение.</p>
-          </div>
-        </div>`);
-      const modal = document.querySelector('#installGuideModal');
-      modal.querySelector('[data-install-close]').onclick = () => modal.classList.remove('open');
-      modal.onclick = event => { if (event.target === modal) modal.classList.remove('open'); };
-    }
-
-    const actions = document.querySelector('.hero-actions');
-    if (!actions || document.querySelector('#installQadamApp')) return;
-    const button = document.createElement('button');
-    button.id = 'installQadamApp';
-    button.className = 'btn hero-secondary pwa-install-button';
-    button.type = 'button';
-    button.textContent = 'Установить приложение';
-    actions.appendChild(button);
-
-    let deferredPrompt = null;
-    window.addEventListener('beforeinstallprompt', event => {
-      event.preventDefault();
-      deferredPrompt = event;
-      button.classList.add('install-ready');
-    });
-    window.addEventListener('appinstalled', () => {
-      deferredPrompt = null;
-      button.remove();
-      toast('Qadam установлен');
-    });
-    button.onclick = async () => {
-      if (deferredPrompt) {
-        deferredPrompt.prompt();
-        const choice = await deferredPrompt.userChoice.catch(() => null);
-        deferredPrompt = null;
-        if (choice?.outcome === 'accepted') button.remove();
-        return;
-      }
-      const modal = document.querySelector('#installGuideModal');
-      const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-      modal.querySelector('[data-install-ios]').hidden = !ios;
-      modal.querySelector('[data-install-android]').hidden = ios;
-      modal.classList.add('open');
-    };
   }
 
   function updateCategoryState() {
@@ -665,7 +605,6 @@
     installDialogEnhancements();
     installClientStudio();
     installClientSideCard();
-    installPwaControls();
     installRenderEnhancements();
     polishExistingContent();
 

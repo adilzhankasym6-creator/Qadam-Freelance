@@ -1,19 +1,21 @@
-/* Qadam Freelance: внешние Telegram-заказы. Подключить после основного script. */
+/* Qadam Premium + Telegram orders. Load after the main inline script. */
 (() => {
-  const readExternalCache = () => {
-    try {
-      const rows = JSON.parse(localStorage.getItem('qadam_external_jobs_cache_v4') || '[]');
-      const now = Date.now();
-      return Array.isArray(rows) ? rows.filter(row => !row.expires_at || new Date(row.expires_at).getTime() > now) : [];
-    } catch { return []; }
-  };
-  const externalState = { rows: readExternalCache(), loaded: false };
+  const externalState = { rows: [], loaded: false };
+  const premiumState = { active: false, type: 'loading', trial_ends_at: null, premium_until: null };
   const categories = [
     'Сайты','Разработка','Мобильные приложения','Telegram-боты','Администрирование',
     'Дизайн','Карточки товаров','3D и архитектура','AI-контент','Видео и анимация',
     'Фото и ретушь','Тексты и копирайтинг','Переводы','Аудио и музыка','Маркетинг',
     'SMM и контент','Маркетплейсы','Бизнес и консультации','Аналитика и данные','Обучение','Другое'
   ];
+
+  // Premium data must not stay visible from an old browser cache after access expires.
+  localStorage.removeItem('qadam_external_jobs_cache_v4');
+
+  const sourceIsTelegram = value => {
+    try { const url = new URL(value); return url.protocol === 'https:' && url.hostname === 't.me'; }
+    catch { return false; }
+  };
 
   function updateAuthLabels() {
     const publish = document.querySelector('#openPublish');
@@ -81,17 +83,81 @@
     });
   }
 
-  const cleanUsername = value => String(value || '').trim().replace(/^@/, '');
-  const validTelegram = value => /^[A-Za-z0-9_]{5,32}$/.test(cleanUsername(value));
-  const sourceIsTelegram = value => {
-    try { const url = new URL(value); return url.protocol === 'https:' && url.hostname === 't.me'; }
-    catch { return false; }
-  };
+  function normalizeStatus(value) {
+    const row = Array.isArray(value) ? value[0] : value;
+    return row && typeof row === 'object'
+      ? { active: !!row.active, type: row.type || 'not_started', trial_ends_at: row.trial_ends_at || null, premium_until: row.premium_until || null }
+      : { active: false, type: 'not_started', trial_ends_at: null, premium_until: null };
+  }
+
+  async function premiumRpc(name) {
+    return normalizeStatus(await api(`rpc/${name}`, { method: 'POST', body: '{}' }));
+  }
+
+  function accessDeadline() {
+    return premiumState.type === 'premium' ? premiumState.premium_until : premiumState.trial_ends_at;
+  }
+
+  function remainingLabel() {
+    if (premiumState.type === 'admin') return 'Доступ администратора';
+    const deadline = new Date(accessDeadline() || 0).getTime();
+    const hours = Math.ceil(Math.max(0, deadline - Date.now()) / 36e5);
+    if (hours < 24) return `${hours} ч. осталось`;
+    return `${Math.ceil(hours / 24)} дн. осталось`;
+  }
+
+  function installPremiumUi() {
+    const main = document.querySelector('main.content');
+    if (main && !document.querySelector('#view-premium')) {
+      main.insertAdjacentHTML('beforeend', `
+        <section class="view" id="view-premium">
+          <div class="premium-shell">
+            <section class="premium-hero">
+              <div><span class="premium-kicker">Qadam Premium</span><h1>Заказы из Telegram<br>в одном месте</h1><p>Свежие объявления по разным категориям. Отклик открывается только через оригинальный Telegram-пост.</p></div>
+              <div class="premium-price"><strong>2 500 ₸</strong><span>за 30 дней</span></div>
+            </section>
+            <div id="premiumContent"></div>
+          </div>
+        </section>`);
+    }
+
+    const nav = document.querySelector('.side-nav');
+    if (nav && !document.querySelector('#premiumNav')) {
+      const catalogButton = nav.querySelector('[data-view="catalog"]');
+      catalogButton?.insertAdjacentHTML('afterend', '<button id="premiumNav" data-view="premium"><span class="side-icon">✦</span>Premium <span class="premium-nav-badge">7 дней</span></button>');
+      document.querySelector('#premiumNav').onclick = event => {
+        event.preventDefault();
+        openPremium();
+      };
+    }
+
+    const feedHead = document.querySelector('#view-catalog .feed-head');
+    if (feedHead && !document.querySelector('#premiumPromo')) {
+      feedHead.insertAdjacentHTML('beforebegin', `
+        <section class="premium-promo" id="premiumPromo">
+          <div><span class="premium-promo-icon">✦</span><strong>Telegram-заказы в Qadam Premium</strong><small id="premiumPromoText">7 дней бесплатно</small></div>
+          <button class="btn" id="premiumPromoButton">Открыть</button>
+        </section>`);
+      document.querySelector('#premiumPromoButton').onclick = openPremium;
+    }
+  }
+
+  function openPremium() {
+    if (!state.user) {
+      openModal('accountModal');
+      return toast('Войдите через Google — получите 7 дней Premium бесплатно');
+    }
+    setView('premium');
+    renderPremium();
+  }
+  window.qadamOpenPremium = openPremium;
 
   function card(row) {
-    const username = cleanUsername(row.telegram_username);
     const source = String(row.source_url || '');
-    const shownBudget = window.qadamFormatBudget
+    const hasForeignCurrency = /(?:\$|€|USD|EUR|доллар|евро)/i.test(String(row.budget || ''));
+    const shownBudget = hasForeignCurrency
+      ? String(row.budget || 'Договорная')
+      : window.qadamFormatBudget
       ? window.qadamFormatBudget(row.budget, row.location, row.currency)
       : row.budget;
     const adminDelete = state.profile?.is_admin
@@ -101,7 +167,7 @@
       <div class="job-body">
         <div class="job-top">
           <span class="tag">${esc(row.category)}</span>
-          <span class="tag tag-new">Из Telegram</span>
+          <span class="tag tag-new">Premium · Telegram</span>
           <span class="job-time">до ${new Date(row.expires_at).toLocaleDateString('ru-RU')}</span>
         </div>
         <h2>${esc(row.title)}</h2>
@@ -109,14 +175,13 @@
         <div class="skills">${(row.skills || []).map(item => `<span>${esc(item)}</span>`).join('')}</div>
         <div class="author">
           <span class="author-pic">T</span>
-          <div><strong>${esc(row.source_name || 'Telegram')}</strong><small>Внешний заказ · контакт не проверен Qadam</small></div>
+          <div><strong>${esc(row.source_name || 'Telegram')}</strong><small>Внешний заказ · отклик только в оригинальном посте</small></div>
         </div>
       </div>
       <aside class="job-side">
         <div><span class="budget-label">Бюджет</span><strong class="budget">${esc(shownBudget)}</strong></div>
         <div class="job-actions">
-          <a class="btn btn-primary" href="https://t.me/${encodeURIComponent(username)}" target="_blank" rel="noopener">Написать заказчику</a>
-          <a class="btn" href="${esc(source)}" target="_blank" rel="noopener">Оригинал объявления</a>
+          <a class="btn btn-primary" href="${esc(source)}" target="_blank" rel="noopener noreferrer">Оригинал в Telegram</a>
           ${adminDelete}
         </div>
         <span class="reply-count">${esc(row.location || 'Удалённо')} · исчезнет через 7 дней</span>
@@ -128,29 +193,14 @@
     const internalCount = typeof activeJobs === 'function'
       ? activeJobs().length
       : (state.jobs || []).filter(row => row.status === 'active').length;
-    const total = internalCount + externalState.rows.length;
+    const total = internalCount + (premiumState.active ? externalState.rows.length : 0);
     const all = document.querySelector('#allCount');
     const side = document.querySelector('#sideCount');
     if (all) all.textContent = String(total);
     if (side) side.textContent = String(total);
   }
 
-  function renderExternal() {
-    document.querySelectorAll('.external-job').forEach(node => node.remove());
-    const list = document.querySelector('#jobList');
-    if (!list) return;
-    const query = String(document.querySelector('#search')?.value || '').trim().toLowerCase();
-    const category = state.category || '';
-    const region = String(document.querySelector('#city')?.value || '');
-    const visible = externalState.rows.filter(row =>
-      (!category || row.category === category) &&
-      (!region || !window.qadamMatchesRegion || window.qadamMatchesRegion(row.location, region)) &&
-      (!query || `${row.title} ${row.description} ${(row.skills || []).join(' ')}`.toLowerCase().includes(query))
-    );
-    if (visible.length) {
-      if (!list.querySelector('.job')) list.querySelector('.empty')?.remove();
-      list.insertAdjacentHTML('beforeend', visible.map(card).join(''));
-    }
+  function bindExternalDelete() {
     document.querySelectorAll('[data-delete-external]').forEach(button => {
       button.onclick = async () => {
         if (!confirm('Удалить внешний заказ?')) return;
@@ -161,32 +211,118 @@
         } catch (error) { toast(error.message || 'Не удалось удалить заказ'); }
       };
     });
+  }
+
+  function filteredRows() {
+    const query = String(document.querySelector('#search')?.value || '').trim().toLowerCase();
+    const category = state.category || '';
+    const region = String(document.querySelector('#city')?.value || '');
+    return externalState.rows.filter(row =>
+      (!category || row.category === category) &&
+      (!region || !window.qadamMatchesRegion || window.qadamMatchesRegion(row.location, region)) &&
+      (!query || `${row.title} ${row.description} ${(row.skills || []).join(' ')}`.toLowerCase().includes(query))
+    );
+  }
+
+  function renderExternal() {
+    document.querySelectorAll('#jobList .external-job').forEach(node => node.remove());
+    const list = document.querySelector('#jobList');
+    if (list && premiumState.active) {
+      const visible = filteredRows();
+      if (visible.length) {
+        if (!list.querySelector('.job')) list.querySelector('.empty')?.remove();
+        list.insertAdjacentHTML('beforeend', visible.map(card).join(''));
+      }
+    }
+    renderPremium();
+    bindExternalDelete();
     updateCombinedCounts();
   }
 
+  function renderPremium() {
+    installPremiumUi();
+    const content = document.querySelector('#premiumContent');
+    const promoText = document.querySelector('#premiumPromoText');
+    const promoButton = document.querySelector('#premiumPromoButton');
+    const badge = document.querySelector('#premiumNav .premium-nav-badge');
+    if (!content) return;
+
+    if (!state.user || premiumState.type === 'guest') {
+      content.innerHTML = '<section class="premium-paywall"><span class="premium-lock">✦</span><h2>7 дней бесплатно</h2><p>Войдите через Google, чтобы открыть свежие Telegram-заказы.</p><button class="btn btn-dark" data-premium-login>Войти через Google</button></section>';
+      content.querySelector('[data-premium-login]')?.addEventListener('click', () => openModal('accountModal'));
+      if (promoText) promoText.textContent = '7 дней бесплатно после входа';
+      if (promoButton) promoButton.textContent = 'Попробовать';
+      if (badge) badge.textContent = '7 дней';
+      return;
+    }
+
+    if (premiumState.type === 'loading') {
+      content.innerHTML = '<div class="premium-loading">Проверяем доступ…</div>';
+      return;
+    }
+
+    if (!premiumState.active) {
+      const setupRequired = premiumState.type === 'setup_required';
+      content.innerHTML = `<section class="premium-paywall"><span class="premium-lock">✦</span><h2>${setupRequired ? 'Premium ещё не настроен' : 'Пробный период закончился'}</h2><p>${setupRequired ? 'Администратору нужно один раз запустить файл qadam_premium.sql в Supabase.' : 'Telegram-заказы скрыты. Qadam Premium стоит 2 500 ₸ за 30 дней.'}</p>${setupRequired ? '' : '<div class="premium-plan"><strong>2 500 ₸</strong><span>30 дней доступа</span></div><button class="btn btn-dark" data-premium-help>Как подключить</button><small>Пока оплату и активацию подтверждает администратор. Автосписаний нет.</small>'}</section>`;
+      content.querySelector('[data-premium-help]')?.addEventListener('click', () => toast('Попросите администратора активировать Premium. Онлайн-оплату добавим отдельно.'));
+      if (promoText) promoText.textContent = premiumState.type === 'setup_required' ? 'Сначала установите qadam_premium.sql' : 'Пробный период закончился';
+      if (promoButton) promoButton.textContent = 'Подключить';
+      if (badge) badge.textContent = '2 500 ₸';
+      return;
+    }
+
+    const label = remainingLabel();
+    const typeLabel = premiumState.type === 'premium' ? 'Premium активен' : premiumState.type === 'admin' ? 'Доступ администратора' : 'Пробный Premium';
+    const jobs = externalState.rows.length
+      ? externalState.rows.map(card).join('')
+      : '<div class="empty-small">Свежих Telegram-заказов пока нет. Новые появятся здесь автоматически.</div>';
+    content.innerHTML = `<div class="premium-status"><div><strong>${typeLabel}</strong><span>${label}</span></div><span class="premium-live">Активен</span></div><div class="job-list premium-job-list">${jobs}</div>`;
+    if (promoText) promoText.textContent = `${typeLabel} · ${label}`;
+    if (promoButton) promoButton.textContent = 'Смотреть';
+    if (badge) badge.textContent = premiumState.type === 'trial' ? label.replace(' осталось', '') : 'Активен';
+  }
+
   async function loadExternal() {
-    let lastError;
+    if (!premiumState.active || !state.user) {
+      externalState.rows = [];
+      externalState.loaded = true;
+      renderExternal();
+      return;
+    }
     try {
-      let rows;
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        try {
-          rows = await api(`external_jobs?select=*&status=eq.active&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&order=created_at.desc`);
-          lastError = null;
-          break;
-        } catch (error) {
-          lastError = error;
-          if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 350));
-        }
-      }
-      if (lastError) throw lastError;
+      const rows = await api(`external_jobs?select=*&status=eq.active&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&order=created_at.desc`);
       externalState.rows = Array.isArray(rows) ? rows : [];
       externalState.loaded = true;
-      try { localStorage.setItem('qadam_external_jobs_cache_v4', JSON.stringify(externalState.rows)); } catch {}
     } catch (error) {
-      console.warn('External jobs:', error.message);
-      externalState.rows = externalState.rows.length ? externalState.rows : readExternalCache();
+      console.warn('Premium orders:', error.message);
+      externalState.rows = [];
+      if (state.view === 'premium') toast('Не удалось загрузить Premium-заказы');
     }
     renderExternal();
+  }
+
+  async function syncPremium({ startTrial = true } = {}) {
+    if (!state.user) {
+      Object.assign(premiumState, { active: false, type: 'guest', trial_ends_at: null, premium_until: null });
+      externalState.rows = [];
+      renderExternal();
+      return;
+    }
+    try {
+      let status = await premiumRpc('qadam_premium_status');
+      if (status.type === 'not_started' && startTrial) status = await premiumRpc('qadam_start_premium_trial');
+      Object.assign(premiumState, status);
+      if (premiumState.active) await loadExternal();
+      else {
+        externalState.rows = [];
+        renderExternal();
+      }
+    } catch (error) {
+      console.warn('Premium status:', error.message);
+      Object.assign(premiumState, { active: false, type: 'setup_required' });
+      externalState.rows = [];
+      renderExternal();
+    }
   }
 
   function installAdminForm() {
@@ -195,18 +331,16 @@
       <div class="modal-bg" id="externalJobModal"><div class="modal">
         <header class="modal-head"><div><h2>Внешний заказ из Telegram</h2><p>Показывается 7 дней, без внутренних откликов</p></div><button class="close" data-external-close>×</button></header>
         <form class="modal-body" id="externalJobForm">
-          <div class="section-note">Публикуйте только краткий пересказ свежего объявления. Нужны разрешение автора и ссылка на оригинал.</div>
+          <div class="section-note">Добавляйте краткий пересказ и обязательно оставляйте ссылку на оригинал.</div>
           <div class="form-grid">
             <div class="field full"><label>Название</label><input name="title" minlength="8" maxlength="100" required></div>
             <div class="field"><label>Категория</label><select name="category">${categories.map(item => `<option>${item}</option>`).join('')}</select></div>
             <div class="field"><label>Бюджет</label><input name="budget" maxlength="40" required placeholder="Например, 80 000 ₸"></div>
-            <div class="field"><label>Telegram заказчика</label><input name="telegram_username" required placeholder="username без @"></div>
-            <div class="field"><label>Город / формат</label><input name="location" value="Удалённо"></div>
+            <div class="field full"><label>Город / формат</label><input name="location" value="Удалённо"></div>
             <div class="field full"><label>Ссылка на оригинальный пост</label><input name="source_url" type="url" required placeholder="https://t.me/channel/123"></div>
             <div class="field full"><label>Название источника</label><input name="source_name" maxlength="80" required placeholder="Название Telegram-канала"></div>
             <div class="field full"><label>Краткий пересказ</label><textarea name="description" minlength="30" maxlength="1000" rows="6" required></textarea></div>
             <div class="field full"><label>Навыки через запятую</label><input name="skills" placeholder="Figma, Webflow, адаптив"></div>
-            <label class="full" style="display:flex;gap:9px;align-items:flex-start;font-size:13px;line-height:1.45"><input name="permission" type="checkbox" required style="margin-top:3px"> Я получил разрешение автора на размещение и не копирую личные данные без согласия.</label>
           </div>
           <div class="modal-actions"><button type="button" class="btn" data-external-close>Отмена</button><button class="btn btn-primary">Опубликовать на 7 дней</button></div>
         </form>
@@ -222,9 +356,7 @@
       event.preventDefault();
       if (!state.user || !state.profile?.is_admin) return toast('Нужны права администратора');
       const form = new FormData(event.target);
-      const username = cleanUsername(form.get('telegram_username'));
       const sourceUrl = String(form.get('source_url') || '').trim();
-      if (!validTelegram(username)) return toast('Проверьте Telegram username');
       if (!sourceIsTelegram(sourceUrl)) return toast('Нужна ссылка вида https://t.me/...');
       const row = {
         created_by: state.user.id,
@@ -234,10 +366,11 @@
         budget: String(form.get('budget') || '').trim(),
         location: String(form.get('location') || '').trim() || 'Удалённо',
         skills: String(form.get('skills') || '').split(',').map(item => item.trim()).filter(Boolean).slice(0, 20),
-        telegram_username: username,
+        telegram_username: null,
         source_url: sourceUrl,
         source_name: String(form.get('source_name') || '').trim(),
-        permission_confirmed: true,
+        permission_confirmed: false,
+        imported_via: 'manual',
         status: 'active',
         expires_at: new Date(Date.now() + 7 * 864e5).toISOString()
       };
@@ -246,7 +379,7 @@
         event.target.reset();
         document.querySelector('#externalJobModal').classList.remove('open');
         await loadExternal();
-        setView('catalog');
+        setView('premium');
         toast('Внешний заказ опубликован на 7 дней');
       } catch (error) { toast(error.message || 'Не удалось опубликовать заказ'); }
     };
@@ -283,7 +416,29 @@
     installAdminButton();
   };
 
+  async function bootPremium() {
+    installPremiumUi();
+    if (supabaseClient) {
+      try {
+        const { data } = await supabaseClient.auth.getSession();
+        if (!data?.session) {
+          state.user = null;
+          state.profile = null;
+          localStorage.removeItem('qadam_user');
+          localStorage.removeItem('qadam_access_token');
+          updateAccount();
+        } else if (!state.user) {
+          for (let i = 0; i < 50 && !state.user; i += 1) await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      } catch {}
+    }
+    await syncPremium({ startTrial: true });
+    installAdminButton();
+  }
+
   installAuthGuard();
   installAdminForm();
-  loadExternal().then(installAdminButton);
+  bootPremium();
+  supabaseClient?.auth.onAuthStateChange(() => setTimeout(() => syncPremium({ startTrial: true }), 250));
+  setInterval(() => syncPremium({ startTrial: false }), 60000);
 })();
