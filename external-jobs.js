@@ -2,6 +2,7 @@
 (() => {
   const externalState = { rows: [], loaded: false, error: '' };
   const premiumState = { active: false, type: 'loading', trial_ends_at: null, premium_until: null };
+  const paymentState = { loading: false };
   const categories = [
     'Сайты','Разработка','Мобильные приложения','Telegram-боты','Администрирование',
     'Дизайн','Карточки товаров','3D и архитектура','AI-контент','Видео и анимация',
@@ -104,6 +105,31 @@
     const hours = Math.ceil(Math.max(0, deadline - Date.now()) / 36e5);
     if (hours < 24) return `${hours} ч. осталось`;
     return `${Math.ceil(hours / 24)} дн. осталось`;
+  }
+
+  async function activateTestPremium() {
+    if (!state.user) {
+      openModal('accountModal');
+      return toast('Сначала войдите через Google');
+    }
+    if (paymentState.loading) return;
+    paymentState.loading = true;
+    renderPremium();
+    try {
+      const { data, error } = await supabaseClient.functions.invoke('premium-payment', {
+        body: { action: 'activate_test' }
+      });
+      if (error) throw new Error(error.message || 'Не удалось выполнить тестовый платёж');
+      if (data?.error) throw new Error(data.error);
+      await syncPremium({ startTrial: false });
+      toast('Тестовая оплата прошла — Premium активирован на 30 дней');
+    } catch (error) {
+      console.warn('Test payment:', error.message);
+      toast(error.message || 'Ошибка тестовой оплаты');
+    } finally {
+      paymentState.loading = false;
+      renderPremium();
+    }
   }
 
   function installPremiumUi() {
@@ -263,8 +289,8 @@
 
     if (!premiumState.active) {
       const setupRequired = premiumState.type === 'setup_required';
-      content.innerHTML = `<section class="premium-paywall"><span class="premium-lock">✦</span><h2>${setupRequired ? 'Premium ещё не настроен' : 'Пробный период закончился'}</h2><p>${setupRequired ? 'Администратору нужно один раз запустить файл qadam_premium.sql в Supabase.' : 'Telegram-заказы скрыты. Qadam Premium стоит 2 500 ₸ за 30 дней.'}</p>${setupRequired ? '' : '<div class="premium-plan"><strong>2 500 ₸</strong><span>30 дней доступа</span></div><button class="btn btn-dark" data-premium-help>Как подключить</button><small>Пока оплату и активацию подтверждает администратор. Автосписаний нет.</small>'}</section>`;
-      content.querySelector('[data-premium-help]')?.addEventListener('click', () => toast('Попросите администратора активировать Premium. Онлайн-оплату добавим отдельно.'));
+      content.innerHTML = `<section class="premium-paywall"><span class="premium-lock">✦</span><h2>${setupRequired ? 'Premium ещё не настроен' : 'Пробный период закончился'}</h2><p>${setupRequired ? 'Администратору нужно один раз запустить файл qadam_premium.sql в Supabase.' : 'Telegram-заказы скрыты. Qadam Premium стоит 2 500 ₸ за 30 дней.'}</p>${setupRequired ? '' : `<div class="premium-plan"><strong>2 500 ₸</strong><span>30 дней доступа</span></div><button class="btn btn-dark" data-premium-test ${paymentState.loading ? 'disabled' : ''}>${paymentState.loading ? 'Проверяем…' : 'Тестовая оплата'}</button><small>Тестовый режим: деньги и данные банковской карты не используются.</small>`}</section>`;
+      content.querySelector('[data-premium-test]')?.addEventListener('click', activateTestPremium);
       if (promoText) promoText.textContent = premiumState.type === 'setup_required' ? 'Сначала установите qadam_premium.sql' : 'Пробный период закончился';
       if (promoButton) promoButton.textContent = 'Подключить';
       if (badge) badge.textContent = '2 500 ₸';
@@ -278,7 +304,11 @@
       : externalState.error
       ? '<div class="empty-small">Не удалось получить Telegram-заказы с сервера.<br><button class="btn" data-premium-refresh style="margin-top:10px">Попробовать снова</button></div>'
       : '<div class="empty-small">Свежих Telegram-заказов пока нет. Перешлите боту новое объявление из публичного канала.</div>';
-    content.innerHTML = `<div class="premium-status"><div><strong>${typeLabel}</strong><span>${label}</span></div><span class="premium-live">Активен</span></div><div class="job-list premium-job-list">${jobs}</div>`;
+    const testPayment = premiumState.type === 'trial' || premiumState.type === 'admin'
+      ? `<div class="section-note" style="margin:14px 0"><strong>Тест оплаты</strong><br>Можно проверить выдачу Premium на 30 дней. Деньги не списываются.<br><button class="btn" data-premium-test style="margin-top:10px" ${paymentState.loading ? 'disabled' : ''}>${paymentState.loading ? 'Проверяем…' : 'Проверить тестовую оплату 2 500 ₸'}</button></div>`
+      : '';
+    content.innerHTML = `<div class="premium-status"><div><strong>${typeLabel}</strong><span>${label}</span></div><span class="premium-live">Активен</span></div>${testPayment}<div class="job-list premium-job-list">${jobs}</div>`;
+    content.querySelector('[data-premium-test]')?.addEventListener('click', activateTestPremium);
     content.querySelector('[data-premium-refresh]')?.addEventListener('click', loadExternal);
     if (promoText) promoText.textContent = `${typeLabel} · ${label}`;
     if (promoButton) promoButton.textContent = 'Смотреть';
