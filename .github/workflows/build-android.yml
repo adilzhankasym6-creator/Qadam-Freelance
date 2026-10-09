@@ -1871,7 +1871,7 @@ jobs:
         run: cp qadam_native_android/app/build/outputs/apk/release/app-release.apk Qadam-v2.0.0.apk
 
       - name: Upload APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: Qadam-Android-v2.0.0
           path: Qadam-v2.0.0.apk
