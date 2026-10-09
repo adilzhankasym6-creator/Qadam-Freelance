@@ -1,0 +1,32 @@
+# Local secrets and environment files
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.jks
+*.keystore
+signing-key-info.txt
+google-services.json
+
+# Supabase / local tooling
+.supabase/
+supabase/.temp/
+
+# JavaScript and Android build output
+node_modules/
+.gradle/
+build/
+**/build/
+local.properties
+*.apk
+*.aab
+
+# IDE, operating-system and logs
+.idea/
+.vscode/
+*.iml
+*.log
+.DS_Store
+Thumbs.db
