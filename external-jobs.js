@@ -107,7 +107,9 @@
   }
 
   function installPremiumUi() {
-    const main = document.querySelector('main.content');
+    // The current Qadam layout uses a plain <main> element. Keep the old
+    // selector as a fallback so Premium works with both layout versions.
+    const main = document.querySelector('main.content') || document.querySelector('main');
     if (main && !document.querySelector('#view-premium')) {
       main.insertAdjacentHTML('beforeend', `
         <section class="view" id="view-premium">
